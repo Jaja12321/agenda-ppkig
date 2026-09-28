@@ -113,13 +113,14 @@ h1 .brand i{font-style:normal; color:var(--orange)}
 @keyframes sorotMasuk{from{opacity:0; transform:translateY(.5rem)}}
 .fjam{font-size:2.5rem; font-weight:800; line-height:1.05; letter-spacing:-.01em; margin-top:.35rem; white-space:nowrap}
 .fjam small{display:block; font-size:.95rem; font-weight:500; opacity:.85; margin-top:.2rem; letter-spacing:0; white-space:normal}
-.feature h2{font-size:1.75rem; line-height:1.18; margin:.3rem 0 0; font-weight:800; letter-spacing:-.01em;
-  display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:4; line-clamp:4; overflow:hidden; overflow-wrap:anywhere}
+.feature h2{font-size:1.75rem; line-height:1.18; margin:.3rem 0 0; font-weight:800; letter-spacing:-.01em; overflow-wrap:anywhere}
+.meta.rapat{grid-gap:.45rem; padding-top:.7rem}
 .meta{display:grid; grid-gap:.8rem; margin-top:.3rem; padding-top:1rem; border-top:1px solid rgba(255,255,255,.2)}
 .mi{display:grid; grid-template-columns:2.3rem minmax(0, 1fr); grid-gap:.8rem; align-items:center}
 .mi > i{display:grid; place-items:center; width:2.3rem; height:2.3rem; border-radius:50%; background:rgba(255,255,255,.92); color:var(--blue); font-size:1.15rem}
 .mi small{display:block; font-size:.7rem; font-weight:700; letter-spacing:.08em; text-transform:uppercase; opacity:.75}
-.mi b{display:block; font-size:1.02rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.mi b{display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; line-clamp:2; overflow:hidden;
+  font-size:1.02rem; font-weight:700; line-height:1.25; overflow-wrap:anywhere}
 .bar{height:.45rem; background:rgba(255,255,255,.22); border-radius:1rem; overflow:hidden}
 .bar i{display:block; height:100%; background:#fff; border-radius:1rem; transition:width 1s linear}
 .stats{position:relative; display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); grid-gap:.65rem; padding:0 .8rem .8rem}
@@ -879,6 +880,17 @@ function render(){
 }
 
 var sorotan = null, idxSorot = 0, kunciSorot = "";
+/* Kecilkan huruf judul (lalu jam) sedikit demi sedikit sampai seluruh isi kartu muat */
+function paskanSorotan(f){
+  var h2 = f.querySelector("h2"), jam = f.querySelector(".fjam"), meta = f.querySelector(".meta");
+  if (!h2) return;
+  var penuh = function(){ return f.scrollHeight > f.clientHeight + 1; };
+  var uj = 1.85, jj = 2.5, bm = 2;
+  h2.style.fontSize = uj + "rem"; if (jam) jam.style.fontSize = jj + "rem";
+  while (penuh() && uj > 1.05){ uj -= .05; h2.style.fontSize = uj.toFixed(2) + "rem"; }
+  while (penuh() && jam && jj > 1.8){ jj -= .1; jam.style.fontSize = jj.toFixed(2) + "rem"; }
+  if (penuh() && meta){ meta.className = "meta rapat"; } // jarak antarbaris meta dirapatkan
+}
 function renderSorotan(){
   if (!sorotan) return;
   var box = document.getElementById("now"), f = document.getElementById("feature");
@@ -908,6 +920,7 @@ function renderSorotan(){
       '<h2>' + esc(s.judul) + '</h2>' + metaHtml(s);
   }
   f.innerHTML = html;
+  paskanSorotan(f);
   var k = sorotan.mode + "|" + s.tanggal + s.mulai + "|" + s.judul;
   if (k !== kunciSorot){ // animasi hanya saat slide berganti
     f.classList.remove("ganti"); void f.offsetWidth; f.classList.add("ganti"); kunciSorot = k;
@@ -915,10 +928,10 @@ function renderSorotan(){
 }
 
 function metaHtml(s){
-  var w = siapa(s), item = function(ikon, label, isi){
+  var item = function(ikon, label, isi){
     return '<div class="mi"><i>' + ik(ikon) + '</i><div><small>' + label + '</small><b>' + esc(isi) + '</b></div></div>';
   };
-  return '<div class="meta">' + (w[1] ? item("orang", w[0], w[1]) : "") + (s.ruang ? item("tempat", "Tempat", s.ruang) : "") +
+  return '<div class="meta">' + (s.trainer ? item("orang", "Pengajar", s.trainer) : "") + (s.ruang ? item("tempat", "Tempat", s.ruang) : "") +
     (s.peserta ? item("papan", "Peserta", s.peserta) : "") + '</div>';
 }
 function labelHari(d){

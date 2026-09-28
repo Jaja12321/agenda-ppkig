@@ -99,9 +99,18 @@ h1 .brand i{font-style:normal; color:var(--orange)}
 .now.empty{background:linear-gradient(165deg, #33456E, #5B6D96)}
 .earth{position:absolute; right:-6rem; bottom:1.5rem; width:19rem; height:19rem; pointer-events:none; opacity:.95}
 .feature{position:relative; padding:1.5rem 1.5rem 1rem; display:grid; align-content:start; grid-gap:.75rem; min-height:0}
-.feature .tag{justify-self:start; background:rgba(20,160,107,.9); color:#fff}
-.now.is-next .feature .tag{background:rgba(255,255,255,.2)}
-.now.empty .feature .tag{background:rgba(255,255,255,.2)}
+.now .feature .tag{justify-self:start; color:#fff; background:rgba(255,255,255,.2)}
+.now .feature .tag.live{background:#14A06B; box-shadow:0 .3rem .8rem rgba(8,60,40,.3)}
+.now .feature .tag.live::before{background:#fff; box-shadow:0 0 0 .2rem rgba(255,255,255,.3)}
+.shd{display:flex; align-items:center; justify-content:space-between; gap:.8rem}
+.sdots{display:flex; gap:.3rem}
+.sdots i{width:.45rem; height:.45rem; border-radius:1rem; background:rgba(255,255,255,.35); transition:width .3s}
+.sdots i.on{width:1.3rem; background:#fff}
+.feature.ganti > *{animation:sorotMasuk .6s ease both}
+.feature.ganti > *:nth-child(2){animation-delay:.05s}
+.feature.ganti > *:nth-child(3){animation-delay:.1s}
+.feature.ganti > *:nth-child(n+4){animation-delay:.15s}
+@keyframes sorotMasuk{from{opacity:0; transform:translateY(.5rem)}}
 .fjam{font-size:2.5rem; font-weight:800; line-height:1.05; letter-spacing:-.01em; margin-top:.35rem; white-space:nowrap}
 .fjam small{display:block; font-size:.95rem; font-weight:500; opacity:.85; margin-top:.2rem; letter-spacing:0; white-space:normal}
 .feature h2{font-size:1.75rem; line-height:1.18; margin:.3rem 0 0; font-weight:800; letter-spacing:-.01em;
@@ -262,7 +271,7 @@ html.gelap html.gelap html.gelap .kosong svg{opacity:.55}
 html.gelap .status.warn{color:#FFB547}
 
 @media (prefers-reduced-motion: reduce){
-  .row, .tag.live::before, .time i, .lbl::after{animation:none}
+  .row, .tag.live::before, .feature.ganti > *, .time i, .lbl::after{animation:none}
   .track{text-overflow:ellipsis}
   .track span{animation:none; padding-left:0; display:inline}
 }
@@ -415,7 +424,8 @@ var CONFIG = {
   tema: "terang",
   cekExcelDetik: 120,       // seberapa sering layar membaca ulang Excel
   barisPerHalaman: 4,       // jumlah kegiatan per halaman di timeline "Hari ini"
-  detikPerHalaman: 12,      // jeda ganti halaman bila sesi lebih banyak
+  detikPerHalaman: 12,
+  detikSorotan: 8,          // jeda ganti slide di kartu kiri bila ada beberapa kegiatan sekaligus      // jeda ganti halaman bila sesi lebih banyak
   hariMendatang: 7,         // rentang hari untuk kotak angka "7 hari ke depan"
   jumlahMendatang: 6,       // jumlah kegiatan di kolom "Jadwal mendatang"
   muatUlangMenit: 60,       // halaman memuat ulang penuh sesekali
@@ -803,29 +813,16 @@ function render(){
   var batas = new Date(); batas.setHours(0,0,0,0); batas.setDate(batas.getDate() + CONFIG.hariMendatang + 1);
   var nanti = sesi.filter(function(s){ return s.tanggal > key && s.a < batas; });
 
-  /* Sorotan utama: kegiatan berjam didahulukan dari kegiatan sehari penuh */
-  var box = document.getElementById("now"), f = document.getElementById("feature"), html;
-  var sorot = liveJam[0] || (nextOne && nextOne.tanggal === key ? null : live[0]);
-  if (sorot){
-    var s = sorot, pasti = !s.seharian && s.sampai !== "selesai";
-    box.className = "now";
-    html = '<span class="tag live">Sedang berlangsung' + (live.length > 1 ? " · " + live.length : "") + '</span>' +
-      '<div class="fjam">' + esc(jamLabel(s)) + '<small>' +
-      (s.seharian ? "Sepanjang hari" : pasti ? "Sisa " + durasi(s.b - now) : "Sampai selesai") + '</small></div>' +
-      (pasti ? '<div class="bar"><i style="width:' + ((now - s.a) / (s.b - s.a) * 100).toFixed(1) + '%"></i></div>' : "") +
-      '<h2>' + esc(s.judul) + '</h2>' + metaHtml(s);
+  /* Sorotan utama: bila ada beberapa kegiatan sekaligus, ditampilkan bergantian (slideshow) */
+  var nextToday = nextOne && nextOne.tanggal === key, mode, daftar;
+  if (liveJam.length || (live.length && !nextToday)){
+    mode = "live"; daftar = liveJam.concat(live.filter(function(s){ return s.seharian; }));
   } else if (nextOne){
-    var isToday = nextOne.tanggal === key;
-    box.className = "now is-next";
-    html = '<span class="tag next">' + (isToday ? "Berikutnya" : "Berikutnya · " + labelHari(nextOne.tanggal)) + '</span>' +
-      '<div class="fjam">' + esc(jamLabel(nextOne)) + '<small>' +
-      (isToday ? "Mulai " + durasi(nextOne.a - now) + " lagi" : fmtTanggal.format(nextOne.a)) + '</small></div>' +
-      '<h2>' + esc(nextOne.judul) + '</h2>' + metaHtml(nextOne);
-  } else {
-    box.className = "now empty";
-    html = '<span class="tag done">Tidak ada jadwal</span><h2>' + esc(pesanKosong) + '</h2>';
-  }
-  f.innerHTML = html;
+    mode = "next"; // kegiatan berikutnya: yang mulai di jam sama (hari ini) atau semua di hari itu (hari lain)
+    daftar = upcoming.filter(function(s){ return s.tanggal === nextOne.tanggal && (!nextToday || s.mulai === nextOne.mulai); });
+  } else { mode = "empty"; daftar = []; }
+  sorotan = { mode: mode, daftar: daftar };
+  renderSorotan();
 
   /* Ringkasan angka */
   var besok = sesi.filter(function(s){ return s.tanggal === tgl(1); }).length;
@@ -881,6 +878,42 @@ function render(){
   }).join("") : '<div class="none">Belum ada jadwal berikutnya.</div>';
 }
 
+var sorotan = null, idxSorot = 0, kunciSorot = "";
+function renderSorotan(){
+  if (!sorotan) return;
+  var box = document.getElementById("now"), f = document.getElementById("feature");
+  var d = sorotan.daftar, n = d.length, now = new Date(), key = tgl(0), html;
+  if (!n){
+    box.className = "now empty"; kunciSorot = "";
+    f.innerHTML = '<span class="tag done">Tidak ada jadwal</span><h2>' + esc(pesanKosong) + '</h2>';
+    return;
+  }
+  idxSorot = idxSorot % n;
+  var s = d[idxSorot], urut = n > 1 ? " · " + (idxSorot + 1) + "/" + n : "";
+  var titik = n > 1 ? '<span class="sdots">' + d.map(function(_, i){ return '<i class="' + (i === idxSorot ? "on" : "") + '"></i>'; }).join("") + '</span>' : "";
+  if (sorotan.mode === "live"){
+    var pasti = !s.seharian && s.sampai !== "selesai";
+    box.className = "now";
+    html = '<div class="shd"><span class="tag live">Sedang berlangsung' + urut + '</span>' + titik + '</div>' +
+      '<div class="fjam">' + esc(jamLabel(s)) + '<small>' +
+      (s.seharian ? "Sepanjang hari" : pasti ? "Sisa " + durasi(s.b - now) : "Sampai selesai") + '</small></div>' +
+      (pasti ? '<div class="bar"><i style="width:' + ((now - s.a) / (s.b - s.a) * 100).toFixed(1) + '%"></i></div>' : "") +
+      '<h2>' + esc(s.judul) + '</h2>' + metaHtml(s);
+  } else {
+    var isToday = s.tanggal === key;
+    box.className = "now is-next";
+    html = '<div class="shd"><span class="tag next">Berikutnya' + (isToday ? "" : " · " + labelHari(s.tanggal)) + urut + '</span>' + titik + '</div>' +
+      '<div class="fjam">' + esc(jamLabel(s)) + '<small>' +
+      (isToday ? "Mulai " + durasi(s.a - now) + " lagi" : fmtTanggal.format(s.a)) + '</small></div>' +
+      '<h2>' + esc(s.judul) + '</h2>' + metaHtml(s);
+  }
+  f.innerHTML = html;
+  var k = sorotan.mode + "|" + s.tanggal + s.mulai + "|" + s.judul;
+  if (k !== kunciSorot){ // animasi hanya saat slide berganti
+    f.classList.remove("ganti"); void f.offsetWidth; f.classList.add("ganti"); kunciSorot = k;
+  }
+}
+
 function metaHtml(s){
   var w = siapa(s), item = function(ikon, label, isi){
     return '<div class="mi"><i>' + ik(ikon) + '</i><div><small>' + label + '</small><b>' + esc(isi) + '</b></div></div>';
@@ -914,6 +947,7 @@ muatExcel();
 renderClock();
 setInterval(renderClock, 1000);
 setInterval(render, 20000);
+setInterval(function(){ if (sorotan && sorotan.daftar.length > 1){ idxSorot++; renderSorotan(); } }, CONFIG.detikSorotan * 1000);
 setInterval(muatExcel, CONFIG.cekExcelDetik * 1000);
 setInterval(function(){ halaman++; render(); }, CONFIG.detikPerHalaman * 1000);
 setTimeout(function(){ location.reload(); }, CONFIG.muatUlangMenit * 60000);
